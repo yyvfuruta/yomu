@@ -1,4 +1,4 @@
-//! Chrome discreto inspirado no miv: título, modo e linha de comando.
+//! Informações de leitura discretas e comandos sob demanda.
 use crate::{
     terminal::Geometry,
     viewer::{Fit, View},
@@ -6,8 +6,6 @@ use crate::{
 use std::{fmt::Write as _, path::Path};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-const BAR: &str = "\x1b[38;2;255;255;255;48;2;34;34;34m";
-const ACCENT: &str = "\x1b[38;2;238;238;238;48;2;51;51;51m";
 const MUTED: &str = "\x1b[0;38;2;187;187;187m";
 const RESET: &str = "\x1b[0m";
 
@@ -18,6 +16,7 @@ pub enum Event {
     Quit,
     Page(usize),
     Fit(Fit),
+    Files,
 }
 #[derive(Default)]
 pub struct Ui {
@@ -85,6 +84,7 @@ const HELP: &[&str] = &[
     "  :fit width     ajustar à largura",
     "  :fit area      ajustar à área",
     "  ? ou :help     esta ajuda",
+    "  Ctrl+p / :files  escolher outro documento",
     "",
     "  Esc ou ?       voltar à leitura",
     "  j / k          rolar esta ajuda",
@@ -117,6 +117,7 @@ impl Ui {
                         }
                         "fit width" => Event::Fit(Fit::Width),
                         "fit area" => Event::Fit(Fit::Area),
+                        "files" => Event::Files,
                         _ => match command.parse::<usize>() {
                             Ok(page) if page > 0 => Event::Page((page - 1).min(total - 1)),
                             _ => {
@@ -158,6 +159,7 @@ impl Ui {
             };
         }
         match key {
+            16 => Event::Files,
             b':' => {
                 self.command = Some(String::new());
                 self.message.clear();
@@ -187,33 +189,18 @@ impl Ui {
         let columns = geo.cols as usize;
         let name = path.file_name().unwrap_or_default().to_string_lossy();
         let mut out = String::new();
-        row(&mut out, 1, columns, "", BAR);
-        let badge = " YOMU ";
-        put(&mut out, 1, 0, badge, ACCENT);
+        row(&mut out, 1, columns, "", MUTED);
         let position = format!(" {} / {total} ", view.page + 1);
         let right = columns.saturating_sub(position.width());
-        let title = fit(&name, right.saturating_sub(badge.len() + 2));
-        let start = ((columns.saturating_sub(title.width())) / 2)
-            .max(badge.len() + 1)
-            .min(right.saturating_sub(title.width() + 1));
-        if start + title.width() < right {
-            put(&mut out, 1, start, &title, BAR);
-        }
-        put(&mut out, 1, right, &position, BAR);
+        let title = fit(&name, right.saturating_sub(2));
+        put(&mut out, 1, 1, &title, MUTED);
+        put(&mut out, 1, right, &position, MUTED);
 
-        let mode = if self.command.is_some() {
-            " COMMAND "
-        } else if self.help {
-            " HELP "
-        } else {
-            " NORMAL "
-        };
-        row(&mut out, geo.rows - 1, columns, "", BAR);
-        put(&mut out, geo.rows - 1, 0, mode, ACCENT);
+        row(&mut out, geo.rows - 1, columns, "", MUTED);
         let fit_mode = if view.fit == Fit::Width {
-            "LARGURA"
+            "largura"
         } else {
-            "ÁREA"
+            "área"
         };
         let location = if view.awaiting_layout {
             "…".into()
@@ -228,28 +215,20 @@ impl Ui {
         };
         let info = format!(" {:.0}%  {fit_mode}  {location} ", view.zoom * 100.0);
         let info_x = columns.saturating_sub(info.width());
-        if info_x > mode.len() {
-            let path = fit(
-                &path.to_string_lossy(),
-                info_x.saturating_sub(mode.len() + 2),
-            );
-            put(&mut out, geo.rows - 1, mode.len() + 1, &path, BAR);
-            put(&mut out, geo.rows - 1, info_x, &info, BAR);
-        }
+        put(&mut out, geo.rows - 1, info_x, &fit(&info, columns), MUTED);
         let bottom = if let Some(command) = &self.command {
             format!(":{command}")
         } else if !self.message.is_empty() {
             format!(" {}", self.message)
         } else if self.loading {
             format!(
-                " {} Preparando página {}…   q sair",
+                " {} Carregando…",
                 ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][phase % 10],
-                view.page + 1
             )
         } else if self.help {
             " Esc voltar · j/k rolar · q sair".into()
         } else {
-            " j/k rolar · h/l página · : comando · ? ajuda · q sair".into()
+            String::new()
         };
         row(
             &mut out,
@@ -381,9 +360,10 @@ mod tests {
             0,
             "12",
         );
-        assert!(output.contains(" YOMU "));
+        assert!(!output.contains(" NORMAL "));
+        assert!(!output.contains("48;2;"));
         assert!(output.contains(" 12 / 24 "));
-        assert!(output.contains("100%  LARGURA"));
+        assert!(output.contains("100%  largura"));
         assert!(output.contains("漫画"));
         assert!(output.contains('…'));
         assert!(!fit("file\x1b[2J", 30).contains('\x1b'));
@@ -404,12 +384,12 @@ mod tests {
             ch: 16,
         };
         let busy = ui.chrome(Path::new("a.cbz"), 3, &view, geo, 0, "");
-        assert!(busy.contains("Preparando página 1"));
+        assert!(busy.contains("Carregando…"));
         ui.key(b':', 3);
         ui.key(b'1', 3);
         ui.key(b'2', 3);
         let prompt = ui.chrome(Path::new("a.cbz"), 3, &view, geo, 0, "");
-        assert!(prompt.contains(" COMMAND "));
+        assert!(!prompt.contains(" COMMAND "));
         assert!(prompt.contains(":12"));
         assert!(prompt.contains("\x1b[?25h"));
     }

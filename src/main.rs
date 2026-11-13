@@ -1,5 +1,6 @@
 mod archive;
 mod document;
+mod picker;
 mod process;
 mod renderer;
 mod state;
@@ -17,7 +18,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-const HELP: &str = "Yomu — PDFs e mangás no terminal via Sixel\n\nUso: yomu [--force-sixel] [--cell-size 8x16] DOCUMENTO\n\nFormatos: PDF, CBZ/ZIP e pasta de PNG/JPEG/WebP.\nTeclas: h/l páginas, j/k rolagem, Ctrl+d/u meia tela, Ctrl+f/b tela,\ngg/G primeira/última, 12G página 12, w/a ajuste, zi/zo zoom, H/L pan.\nComandos: :12 página 12, ? ou :help ajuda, q ou :q sair.\n\nDependências: Poppler (pdfinfo, pdftoppm), libsixel (img2sixel) e libarchive.\n";
+const HELP: &str = "Yomu — PDFs e mangás no terminal via Sixel\n\nUso: yomu [--force-sixel] [--cell-size 8x16] [DOCUMENTO]\n\nFormatos: PDF, CBZ/ZIP e pasta de PNG/JPEG/WebP.\nTeclas: h/l páginas, j/k rolagem, Ctrl+d/u meia tela, Ctrl+f/b tela,\ngg/G primeira/última, 12G página 12, w/a ajuste, zi/zo zoom, H/L pan.\nComandos: :12 página 12, ? ou :help ajuda, q ou :q sair.\n\nDependências: Poppler (pdfinfo, pdftoppm), libsixel (img2sixel) e libarchive.\n";
 
 struct Args {
     path: PathBuf,
@@ -67,7 +68,7 @@ fn arguments() -> Result<Option<Args>> {
         }
     }
     Ok(Some(Args {
-        path: path.context("Informe PDF, CBZ/ZIP ou pasta. Use yomu --help")?,
+        path: path.unwrap_or_else(|| PathBuf::from(".")),
         force,
         cell,
     }))
@@ -88,12 +89,29 @@ fn run() -> Result<()> {
         signal_hook::flag::register(signal, stop.clone())?;
     }
     let _ = process::STOP.set(stop);
-    let document = document::Document::open(&args.path)?;
     let mut terminal = terminal::Terminal::enter()?;
-    if !args.force && !terminal.supports_sixel()? {
-        bail!("O terminal não anunciou Sixel. Use um terminal compatível, como xterm com Sixel habilitado. Se já houver suporte, tente --force-sixel. Multiplexadores podem bloquear consultas e imagens.");
+    let mut path = args.path;
+    let mut choose = picker::should_pick(&path)?;
+    let mut sixel_checked = args.force;
+    loop {
+        if choose {
+            let Some(selected) = picker::select(&mut terminal, &path)? else {
+                return Ok(());
+            };
+            path = selected;
+        }
+        let document = document::Document::open(&path)?;
+        let parent = document.path.parent().unwrap_or(&document.path).to_owned();
+        if !sixel_checked && !terminal.supports_sixel()? {
+            bail!("O terminal não anunciou Sixel. Use um terminal compatível, como foot, ou tente --force-sixel se já houver suporte.");
+        }
+        sixel_checked = true;
+        if !viewer::run(document, &mut terminal, args.cell)? {
+            return Ok(());
+        }
+        path = parent;
+        choose = true;
     }
-    viewer::run(document, &mut terminal, args.cell)
 }
 fn main() {
     if let Err(error) = run() {

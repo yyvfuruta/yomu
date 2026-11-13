@@ -47,12 +47,18 @@ A libarchive é vinculada dinamicamente e descoberta pelo `pkg-config` durante a
 ## Executar
 
 ```sh
+yomu .
+yomu /tmp/manga/
 yomu documento.pdf
 yomu capitulo.cbz
 yomu pasta-de-imagens/
 yomu --force-sixel documento.pdf
 yomu --cell-size 10x20 capitulo.cbz
 ```
+
+`yomu` sem argumentos e `yomu .` abrem o seletor no diretório atual. Diretórios com PDFs, CBZs ou ZIPs mostram os documentos e subpastas para escolher; pastas de imagens continuam abrindo como capítulos. Em pastas mistas, selecione `Imagens desta pasta/` para ler as imagens diretamente.
+
+No seletor, `j`/`k` escolhem, `Enter` ou `l` abrem, `h` sobe um diretório, `gg`/`G` vão ao início/fim e `/` filtra pelo nome. `Enter` confirma o filtro e `Esc` limpa; fora do filtro, `q` ou `Esc` saem. Durante a leitura, `Ctrl+p` ou `:files` abrem o seletor na pasta do documento. Arquivos ocultos e formatos incompatíveis não aparecem na lista.
 
 Use um terminal com Sixel habilitado, como foot ou xterm compilado com esse recurso. Yomu consulta os atributos do terminal para detectar Sixel; sem confirmação, encerra com uma mensagem explicativa. `--force-sixel` permite ignorar a detecção, mas o terminal ainda precisa suportar imagens Sixel. Multiplexadores podem bloquear as consultas e as imagens; teste diretamente no terminal primeiro.
 
@@ -80,6 +86,7 @@ Não há controles por setas, mouse ou menus. Prefixos numéricos funcionam em n
 | `:12` | Ir para a página 12 |
 | `:fit width` / `:fit area` | Ajustar à largura / área pela linha de comando |
 | `:q` | Sair pela linha de comando |
+| `Ctrl+p` / `:files` | Abrir o seletor de documentos |
 | `q` | Sair |
 
 O leitor abre ajustado à largura para leitura vertical. Role até o fim da página e continue descendo para abrir o topo da próxima; subindo a partir do topo, abre o fim da anterior. Páginas que cabem inteiras na tela avançam diretamente com `j`. A primeira e a última página limitam a rolagem, sem dar a volta no documento. Teclas repetidas durante o carregamento não pulam páginas ainda não exibidas. `h`/`l` continuam disponíveis para trocar diretamente de página.
@@ -88,12 +95,12 @@ O zoom é relativo ao ajuste escolhido. Navegar diretamente com `h`/`l` volta ao
 
 ## Interface
 
-A interface segue a estrutura visual do [miv](https://github.com/yyvfuruta/miv): fundo da área de leitura herdado do terminal, barras cinza escuro e linha de comando independente.
+A interface usa o fundo do terminal e informações discretas, com foco na leitura.
 
-- Cabeçalho com nome do documento centralizado e página atual/total à direita.
+- Cabeçalho com nome do documento e página atual/total à direita.
 - Imagem centralizada com margens laterais e indicador vertical de rolagem à direita.
-- Barra inferior com modo `NORMAL`, `COMMAND` ou `HELP`, caminho, zoom, ajuste e posição (`Topo`, porcentagem, `Fim` ou `Tudo`).
-- Linha final com atalhos, prefixo Vim em andamento (`12`, `g`, `z`), comandos ou indicação de carregamento. Alterar essas informações não recodifica a imagem.
+- Rodapé sem blocos de cor ou rótulos de modo, com zoom, ajuste e posição (`Topo`, porcentagem, `Fim` ou `Tudo`).
+- Linha de interação vazia durante a leitura, usada apenas para prefixos (`12`, `g`, `z`), comandos, mensagens e um pequeno indicador de carregamento. Os atalhos ficam na ajuda. Alterar essas informações não recodifica a imagem.
 - Ajuda acessível por `?` e `:help`, com rolagem por `j`/`k`, inclusive enquanto a página carrega. `q` continua saindo do aplicativo; `Esc` retorna à leitura.
 
 Na linha de comando, `Backspace` apaga, `Ctrl+u` limpa e `Enter` executa. O tamanho mínimo do terminal é de 20 colunas por 6 linhas; nomes longos são abreviados sem esconder o contador de páginas.
@@ -128,6 +135,7 @@ Para conferir a integração visual, abra os três formatos em um terminal Sixel
 - `src/terminal.rs`: tela alternativa, raw mode, consultas e entrada.
 - `src/viewer.rs`: comandos, layout, zoom e renderização Sixel.
 - `src/ui.rs`: cabeçalho, status, indicador de rolagem, ajuda e linha de comando.
+- `src/picker.rs`: escolha de documentos, navegação de diretórios e filtro.
 - `src/state.rs`: persistência atômica por documento.
 - `src/process.rs`: subprocessos, cancelamento e timeouts.
 - `src/renderer.rs`: processamento em segundo plano, cache e descarte de quadros antigos.

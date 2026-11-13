@@ -273,7 +273,7 @@ fn display(term: &Terminal, geo: Geometry, frame: &crate::renderer::Frame) -> Re
     term.write(&frame.sixel)
 }
 
-pub fn run(doc: Document, term: &mut Terminal, cell: (u32, u32)) -> Result<()> {
+pub fn run(doc: Document, term: &mut Terminal, cell: (u32, u32)) -> Result<bool> {
     use crate::ui::{Event, Ui};
     let doc = Arc::new(doc);
     let mut renderer = crate::renderer::Renderer::new(doc.clone());
@@ -316,7 +316,8 @@ pub fn run(doc: Document, term: &mut Terminal, cell: (u32, u32)) -> Result<()> {
                 chrome_dirty = true;
                 let action = match ui.key(byte, doc.count) {
                     Event::View(key) => view.key(key, doc.count),
-                    Event::Quit => return Ok(()),
+                    Event::Quit => return Ok(false),
+                    Event::Files => return Ok(true),
                     Event::Chrome => {
                         view.clear_pending_keys();
                         Action::None
@@ -332,7 +333,7 @@ pub fn run(doc: Document, term: &mut Terminal, cell: (u32, u32)) -> Result<()> {
                     }
                 };
                 match action {
-                    Action::Quit => return Ok(()),
+                    Action::Quit => return Ok(false),
                     Action::Page => {
                         if history.write(view.page).is_err() {
                             ui.message = "Não foi possível salvar progresso".into();
@@ -404,7 +405,7 @@ pub fn run(doc: Document, term: &mut Terminal, cell: (u32, u32)) -> Result<()> {
                 chrome_dirty = false;
             }
         }
-        Ok(())
+        Ok(false)
     })();
     if let Err(error) = history.write(view.page) {
         eprintln!("\r\nyomu: falha ao salvar progresso: {error}");
