@@ -1,0 +1,20 @@
+[package]
+name = "yomu"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Visualizador de PDFs e mangás no terminal via Sixel"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0"
+libc = "0.2"
+crossterm = "0.28"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+sha2 = "0.10"
+signal-hook = "0.3"
+tempfile = "3"
+unicode-width = "0.2"
+
+[build-dependencies]
+pkg-config = "0.3"
